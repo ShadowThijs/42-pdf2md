@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.mypy_cache/
+dist/
+build/
+*.egg-info/
+.venv/
+*.egg
+.omc/
+tests/
+example/
+uv.lock

@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pdf2md"
+version = "0.1.0"
+description = "Convert 42 campus LaTeX-generated PDFs to Markdown"
+requires-python = ">=3.10"
+dependencies = [
+    "fitz>=0.0.1.dev2",
+    "PyMuPDF>=1.23.0",
+]
+
+[project.scripts]
+pdf2md = "src.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["src*"]
