@@ -841,20 +841,20 @@ class PDFParser:
         )], consumed
 
     def _is_table_header(self, line: list[dict]) -> bool:
-        """Detect table header: has spans aligned at 3+ distinct x-positions with Mono keys."""
-        if len(line) < 4:
+        """Detect table header: spans aligned at 3+ well-separated column positions."""
+        if len(line) < 3:
             return False
-        mono_count = sum(1 for s in line if _is_mono(s.get("font", "")))
-        if mono_count < 2:
-            return False
-        # Check for 3+ distinct x-positions (columns)
+        # Check for 3+ distinct x-positions with large inter-column gaps
         xs = sorted(set(round(s["bbox"][0]) for s in line))
-        # Cluster nearby x-positions
         clusters: list[int] = [xs[0]]
         for x in xs[1:]:
             if x - clusters[-1] > 10:
                 clusters.append(x)
-        return len(clusters) >= 3
+        if len(clusters) < 3:
+            return False
+        # Columns must be widely separated (gaps > 50pt between column starts)
+        gaps = [clusters[i + 1] - clusters[i] for i in range(len(clusters) - 1)]
+        return min(gaps) > 50
 
     def _parse_table(
         self, lines: list[list[dict]], idx: int, pn: int
@@ -893,12 +893,22 @@ class PDFParser:
             element_type=ElementType.TABLE, rows=rows, page_number=pn), consumed
 
     def _detect_columns(self, line: list[dict]) -> list[float]:
-        """Detect column x-positions from a line's spans."""
+        """Detect column x-positions from a line's spans using large-gap clustering."""
         xs = sorted(set(round(s["bbox"][0]) for s in line))
-        clusters: list[float] = [xs[0]]
+        if not xs:
+            return []
+        # Use a large threshold (50pt) to find actual column boundaries
+        # rather than individual word positions
+        clusters: list[float] = [float(xs[0])]
         for x in xs[1:]:
-            if x - clusters[-1] > 10:
+            if x - clusters[-1] > 50:
                 clusters.append(float(x))
+        # If only 1 cluster with large threshold, try smaller threshold
+        if len(clusters) < 3:
+            clusters = [float(xs[0])]
+            for x in xs[1:]:
+                if x - clusters[-1] > 10:
+                    clusters.append(float(x))
         return clusters
 
     def _extract_table_row(
@@ -907,9 +917,27 @@ class PDFParser:
         """Extract cells from a table row using column positions."""
         cells: list[list[str]] = [[] for _ in range(num_cols)]
 
+        # For 3-column tables with mono-regular-mono pattern,
+        # use font type to assign spans to the correct column.
+        if num_cols == 3:
+            mono_indices = [i for i, s in enumerate(line) if _is_mono(s.get("font", ""))]
+            reg_indices = [i for i, s in enumerate(line) if not _is_mono(s.get("font", ""))]
+            # If we have mono text at both ends and regular in the middle
+            if mono_indices and reg_indices:
+                mono_xs = [line[i]["bbox"][0] for i in mono_indices]
+                reg_xs = [line[i]["bbox"][0] for i in reg_indices]
+                mid_x = (col_xs[0] + col_xs[-1]) / 2
+                for idx in mono_indices:
+                    sx = line[idx]["bbox"][0]
+                    col = 0 if sx < mid_x else num_cols - 1
+                    cells[col].append(line[idx]["text"])
+                for idx in reg_indices:
+                    cells[1].append(line[idx]["text"])
+                return [" ".join(cell).strip() for cell in cells]
+
+        # Fallback: nearest column assignment
         for span in line:
             sx = span["bbox"][0]
-            # Find nearest column
             best_col = 0
             best_dist = float("inf")
             for ci, cx in enumerate(col_xs):
