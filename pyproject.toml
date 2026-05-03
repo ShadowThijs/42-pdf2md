@@ -8,8 +8,7 @@ version = "0.1.0"
 description = "Convert 42 campus LaTeX-generated PDFs to Markdown"
 requires-python = ">=3.10"
 dependencies = [
-    "fitz>=0.0.1.dev2",
-    "PyMuPDF>=1.23.0",
+    "pymupdf>=1.24.0",
 ]
 
 [project.scripts]

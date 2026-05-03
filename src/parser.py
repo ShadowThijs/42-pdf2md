@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import fitz
+import pymupdf
 
 from .config import (
     COLOR_GREEN,
@@ -173,7 +173,7 @@ class PDFParser:
         self.pdf_path = Path(pdf_path)
 
     def parse(self) -> Document:
-        doc = fitz.open(str(self.pdf_path))
+        doc = pymupdf.open(str(self.pdf_path))
         elements: list[DocElement] = []
 
         if len(doc) == 0:
@@ -194,9 +194,9 @@ class PDFParser:
 
         return Document(elements=elements)
 
-    def _extract_lines(self, page: fitz.Page) -> list[list[dict]]:
+    def _extract_lines(self, page: pymupdf.Page) -> list[list[dict]]:
         """Extract spans grouped into lines by y-coordinate."""
-        data = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)
+        data = page.get_text("dict", flags=pymupdf.TEXT_PRESERVE_WHITESPACE)
         all_spans: list[dict] = []
 
         for block in data["blocks"]:
@@ -248,7 +248,7 @@ class PDFParser:
 
     # ── Title Page ──────────────────────────────────────────────────
 
-    def _parse_title_page(self, page: fitz.Page, pn: int) -> list[DocElement]:
+    def _parse_title_page(self, page: pymupdf.Page, pn: int) -> list[DocElement]:
         lines = self._extract_lines(page)
         elements: list[DocElement] = []
 
@@ -276,7 +276,7 @@ class PDFParser:
 
     # ── Table of Contents ───────────────────────────────────────────
 
-    def _parse_toc_page(self, page: fitz.Page, pn: int) -> list[DocElement] | None:
+    def _parse_toc_page(self, page: pymupdf.Page, pn: int) -> list[DocElement] | None:
         lines = self._extract_lines(page)
         if not lines:
             return None
@@ -327,7 +327,7 @@ class PDFParser:
 
     # ── Content Pages ───────────────────────────────────────────────
 
-    def _parse_content_page(self, page: fitz.Page, pn: int) -> list[DocElement]:
+    def _parse_content_page(self, page: pymupdf.Page, pn: int) -> list[DocElement]:
         lines = self._extract_lines(page)
         elements: list[DocElement] = []
 
@@ -565,7 +565,7 @@ class PDFParser:
 
     # ── Helpers ──────────────────────────────────────────────────────
 
-    def _detect_callout_boxes(self, page: fitz.Page) -> list[tuple[float, float]]:
+    def _detect_callout_boxes(self, page: pymupdf.Page) -> list[tuple[float, float]]:
         """Detect LaTeX callout box y-ranges from page drawings with colored fills."""
         boxes: list[tuple[float, float]] = []
         for drawing in page.get_drawings():
@@ -649,7 +649,7 @@ class PDFParser:
             return False
         return _color_matches(line[0]["color"], COLOR_LIGHT_GRAY, 0x30)
 
-    def _detect_grid_regions(self, page: fitz.Page) -> list[tuple[float, float]]:
+    def _detect_grid_regions(self, page: pymupdf.Page) -> list[tuple[float, float]]:
         """Detect table regions from horizontal line grids in page drawings."""
         drawings = page.get_drawings()
         h_lines: list[float] = []
